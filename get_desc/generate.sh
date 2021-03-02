@@ -3,49 +3,31 @@
 #
 # Author: rachpt@126.com
 # Version: 3.1v
-# Date: 2019-04-13
+# Date: 2019-10-28
 #
 #-------------------------------------#
 # 本文件通过豆瓣或者IMDB链接(如果都没有则使用资源0day名)，
-# 首先通过 @Rhilip 提供的API获得简介，失败则通过 python
+# 通过 @Rhilip 提供的API获得简介，或则本地 python 解析,
 # 本地生成豆瓣简介(需要设置允许)。
 #-------------------------------------#
 
-# 通过 豆瓣 API 搜索资源豆瓣ID，用于后续简介获取
+# 通过 豆瓣 suggest 搜索资源豆瓣ID，用于后续简介获取
 get_douban_url_by_keywords() {
-  # function
   search_doubanurl() {
-  local name season year num
-  # 剧集季数
-  season="$(echo "$1"|grep -Eio '[ \.]s0?(10|20|[1-9]+).?(ep?[0-9]+)?[ \.]')"
-  [[ $season ]] && season="$(echo "$season"|sed -E \
-    's/s0?(10|20|[1-9]+).?(ep?[0-9]+)?[ \.]/Season.\1/i')"
-  # 年份
-  year="$(echo "$1"|grep -Eo '[12][098][0-9]{2}'|tail -1)"
-  num="$(echo "$1"|grep -Eo '[12][098][0-9]{2}'|wc -l)" # 统计year个数
-  # 删除分辨率
-  name="$(echo "$1"|sed -E 's/(1080[pi]|720p|4k|2160p).*//i')"
-  # 删除介质
-  name="$(echo "$name"|sed -E 's/(hdtv|blu-?ray|web-?dl|bdrip|dvdrip|webrip).*//i')"
-  # 删除季数
-  name="$(echo "$name"|sed -E 's/[ \.]s0?(10|20|[1-9]+).?(ep?[0-9]+)?[ \.].*//i')"
-  name="$(echo "$name"|sed -E 's/[ \.]ep?[0-9]{1,2}(-e?p?[0-9]{1,2})?[ \.].*//i')"
-  # 删除合集
-  name="$(echo "$name"|sed -E 's/[ \.]Complete[\. ].*//i')"
-  # 删除年份
-  [[ $num -ge 1 ]] && name="$(echo "$name"|sed -E 's/[ \.][12][098][0-9]{2}[ \.]/./g')"
-  # 删除连续点和空格
-  name="$(echo "$name"|sed -E 's/[ \.]+/./g')"
-  # 搜索
+  local _key _year
+  _key="$(get_search_keys "$1" 'db')"  # get_desc/detail_page.sh
+  _year="$(echo "$1"|grep -Eo '[12][098][0-9]{2}'|tail -1)"
+  [[ "$_year" ]] || _year=`date +%Y` # 默认当前年份
   search_url="$(http --verify=no --pretty=format --ignore-stdin --timeout=25 \
-    -b GET 'https://api.douban.com/v2/movie/search' q=="${name}${season}.${year}" \
-   "$user_agent"|grep -E '(movie.)?douban.com/subject/'|head -1|awk -F '"' '{print $4}')"
+    -b GET 'https://movie.douban.com/j/subject_suggest' q=="$_key" "$user_agent"| \
+    grep -B 1 "$_year"|grep -Eio \
+    'https?://(movie.)?douban.com/subject/[0-9]+'|head -1)"
   # 去掉可能不准确的年份再试
   [[ "$search_url" ]] || \
-   search_url="$(http --verify=no --pretty=format --ignore-stdin --timeout=25 \
-   -b GET 'https://api.douban.com/v2/movie/search' q=="${name}${season}" \
-   "$user_agent"|grep -E '(movie.)?douban.com/subject/'|head -1|awk -F '"' '{print $4}')"
-  debug_func "豆瓣关键词:[${name}|${season}|.${year}]"  #----debug---
+  search_url="$(http --verify=no --pretty=format --ignore-stdin --timeout=25 \
+    -b GET 'https://movie.douban.com/j/subject_suggest' q=="$_key" "$user_agent"| \
+    grep -Eio 'https?://(movie.)?douban.com/subject/[0-9]+'|head -1)"
+  debug_func "豆瓣关键词:[${_key}+${_year}]"  #----debug---
   }
   # the first time try
   search_doubanurl "$org_tr_name"
@@ -149,7 +131,7 @@ from_douban_get_desc() {
   debug_func "generate-search-url:[$search_url]" #----debug---
   # 使用 API 或者 python 本地解析豆瓣简介
   if [ "$search_url" ]; then
-    local desc_json _get
+    local desc_json _get i _sk
     unset gen_desc_bbcode douban_poster_url chs_name_douban eng_name_douban
     if [[ $Use_Local_Gen = yes ]]; then
       desc_json="$("$python3" -c "import sys;sys.path.append(\"${ROOT_PATH}/get_desc/\"); \
@@ -158,17 +140,20 @@ print(json.dumps(gen,sort_keys=True,indent=2,separators=(',',':'),ensure_ascii=F
     fi
     _get="$(echo "$desc_json"|grep -Eq '"format".+".+",' && echo yes || echo no)"
     debug_func "generate-code-local:[$_get]" #----debug---
-    if [[ $_get = no ]]; then
-      local _s_key
-      [[ $imdb_url ]] && _s_key="site=douban&sid=$imdb_url" || _s_key="url=$search_url"
-      desc_json="$(http --pretty=format --ignore-stdin --timeout=46 GET \
-        "https://api.rhilip.info/tool/movieinfo/gen?${_s_key}")"
+    for ((i=1;i<=2;i++)); do
+     if [[ $_get = no ]]; then
+      [[ $imdb_url ]] && _sk="site=douban&sid=$imdb_url" || _sk="url=$search_url"
+      desc_json="$(http --pretty=format --ignore-stdin --timeout=36 --verify=no \
+        GET "`eval echo '$'db_api_$i`?${_sk}")"
       _get="$(echo "$desc_json"|grep -Eq '"format".+".+",' && echo yes || echo no)"
-      debug_func "generate-code-api:[$_get]" #----debug---
-    fi
+      debug_func "generate-code-api-$i:[$_get]" #----debug---
+     else
+      break
+     fi
+    done
 
     gen_desc_bbcode="$(echo "$desc_json"|grep 'format'| \
-        awk -F '"' '{print $4}'|sed 's#\\n#\n#g;s/img3/img1/')"
+        awk -F '"' '{print $4}'|sed 's#\\n#\n#g;s/img3/img1/;s/\[center\]//;s%\[/center\]%%')"
 
     douban_poster_url="$(echo "$desc_json"|grep '"poster":'| \
         head -1|awk -F '"' '{print $4}'|sed 's/img3/img1/')"
@@ -188,7 +173,7 @@ print(json.dumps(gen,sort_keys=True,indent=2,separators=(',',':'),ensure_ascii=F
 filt_subt() {
  [[ "$chs_name_douban" && "$extra_subt" ]] && {
    extra_subt="$(echo "$extra_subt"|sed -E \
-   "s/$chs_name_douban//;s%^[ /]+%%;s/ +/ /g;s/&quot;//g")"
+   "s/$chs_name_douban//;s%^[ /]+%%;s/ +/ /g;s/&quot;//g;s/\[ *\]//g")"
  }
 }
 #-------------------------------------#
@@ -197,13 +182,14 @@ generate_main_func() {
     from_douban_get_desc
     filt_subt
     # bbcode
+    : "$(< "$source_desc")"
 source_desc_tmp="&extra_comment&${extra_subt}
 &shc_name_douban&${chs_name_douban}
 &eng_name_douban&${eng_name_douban}
 ${gen_desc_bbcode}
 
 [quote=iNFO][font=monospace]
-$([[ -s $source_desc ]] && cat "$source_desc" || echo 'Failed to get mediainfo!')
+$([[ -s $source_desc ]] && echo "$_" || echo 'Failed to get mediainfo!')
 [/font][/quote]
 $(if [ $source_t_id ]; then
     echo -e "\n[quote=转载来源][b]本种来自：[/b] ${source_site_URL}/details.php?id=${source_t_id}[/quote]"
@@ -213,9 +199,11 @@ fi )
 "
 
     # byrbt 所需要的 html 简介
-[[ $enable_byrbt = yes ]] && source_html_tmp="${gen_desc_html}<br /><br /><br />
+[[ $enable_byrbt = yes ]] && {
+  : "$(< "$source_html")"
+  source_html_tmp="${gen_desc_html}<br />
 <fieldset><legend><span style=\"color:#ffffff;background-color:#000000;\">iNFO</span></legend><font face=\"Courier New\">
-$([[ -s $source_desc ]] && cat "$source_html" || echo 'Failed to get mediainfo!')
+$([[ -s $source_desc ]] && echo "$_" || echo 'Failed to get mediainfo!')
 </font></fieldset><br /><br /><br /><br /><br /><fieldset><legend>
 <span style=\"color:#ffffff;background-color:#000000;\">转载来源</span></legend>
 $(if [ $source_t_id ]; then
@@ -223,7 +211,7 @@ $(if [ $source_t_id ]; then
 else
     echo '<span style="font-size:20px;">本种来自： '${source_site_URL}'</span>'
 fi)
-<br /></fieldset><br />"
+<br /></fieldset><br />"; }
 
     # 简介覆盖保存至文件 
     echo "$source_desc_tmp" > "$source_desc"

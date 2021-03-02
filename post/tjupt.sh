@@ -19,10 +19,10 @@ downloadUrl="${post_site[tjupt]}/download.php?id="
 gen_tjupt_parameter() {
 
 if [ -s "$source_desc2tjupt" ]; then
-tjupt_des="$(echo "$descrCom_simple"|sed "s/&ratio_in_desc&/$ratio_tjupt/g")
-$(cat "$source_desc2tjupt"|sed '/&shc_name_douban&/d;/&eng_name_douban&/d')"
+tjupt_des="${descrCom_simple/&ratio_in_desc&/$ratio_tjupt}
+$(sed '/&shc_name_douban&/d;/&eng_name_douban&/d;/&extra_comment&/d' "$source_desc2tjupt")"
 else
-tjupt_des="$(echo "$descrCom_simple"|sed "s/&ratio_in_desc&/$ratio_tjupt/g")
+tjupt_des="${descrCom_simple/&ratio_in_desc&/$ratio_tjupt}
 $failed_to_get_des"
 fi
 
@@ -44,7 +44,7 @@ else
 fi
 # 年份
 tjupt_year="$(echo "$dot_name"|grep -Eo '[12][089][0-9]{2}'|sed '/1080/d'|tail -1)"
-[ ! "$tjupt_year" ] $$ tjupt_year=2018  # 默认年份
+[ ! "$tjupt_year" ] && tjupt_year=2018  # 默认年份
 
 # 电影格式
 if [ "$is_1080p" = 'yes' ]; then
@@ -105,13 +105,14 @@ t_id="$(http --verify=no --ignore-stdin -f --print=h POST "$postUrl"\
     'formatratio'="$jutpt_stardand"\
     'subsinfo'="$tjupt_subsinfo"\
     'district'="$region"\
+    'specificcat'="$region"\
     'source_sel'="$tjupt_source"\
     'team_sel'="$tjupt_team"\
     'uplver'="$anonymous_tjupt"\
     file@"${torrent_Path}"\
-    "$cookie_tjupt"|grep "id="|grep 'detail'|head -1|cut -d '=' -f 2|cut -d '&' -f 1)"
+    "$cookie_tjupt"|grep -om1 '[^a-z]detail[^;"]*id=[0-9]*'|grep -om1 '[0-9]*')"
 
-if [ -z "$t_id" ]; then
+if [[ -z "$t_id" ]]; then
     # 辅种
     reseed_torrent
 fi

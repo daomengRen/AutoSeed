@@ -19,10 +19,10 @@ downloadUrl="${post_site[cmct]}/download.php?id="
 gen_cmct_parameter() {
 
 if [ -s "$source_desc" ]; then
-    cmct_des="$(echo "$descrCom_simple"|sed "s/&ratio_in_desc&/$ratio_cmct/g")
-$(cat "$source_desc"|sed '/&shc_name_douban&/d;/&eng_name_douban&/d')"
+    cmct_des="${descrCom_simple//&ratio_in_desc&/$ratio_cmct}
+$(sed '/&shc_name_douban&/d;/&eng_name_douban&/d' "$source_desc")"
 else
-    cmct_des="$(echo "$descrCom_complex"|sed "s/&ratio_in_desc&/$ratio_cmct/g")
+    cmct_des="${descrCom_simple//&ratio_in_desc&/$ratio_cmct}
 $failed_to_get_des"
 fi
 
@@ -165,28 +165,28 @@ esac
 
 #-------------------------------------#
 cmct_post_func() {
-    gen_cmct_parameter
-    #---post data---#
-t_id=$(http --verify=no --ignore-stdin -f --print=h POST "$postUrl"\
-    'name'="$dot_name"\
-    'small_descr'="$cmct_small_descr"\
-    'url'="$imdb_url"\
-    'descr'="$cmct_des"\
-    'type'="$cmct_type"\
-    'medium_sel'="$cmct_medium"\
-    'codec_sel'="$cmct_codec"\
-    'audiocodec_sel'="$cmct_audio"\
-    'standard_sel'="$cmct_standard"\
-    'source_sel'="$cmct_source"\
-    'pack'="$is_package"\
-    'uplver'="$anonymous_cmct"\
-    file@"${torrent_Path}"\
-    "$cookie_cmct"|grep 'id='|grep 'detail'|head -1|cut -d '=' -f 2|cut -d '&' -f 1)
+  gen_cmct_parameter
+  #---post data---#
+id="$(http --verify=no --ignore-stdin -f --print=h POST "$postUrl"\
+  'name'="$dot_name"\
+  'small_descr'="$cmct_small_descr"\
+  'url'="$imdb_url"\
+  'descr'="$cmct_des"\
+  'type'="$cmct_type"\
+  'medium_sel'="$cmct_medium"\
+  'codec_sel'="$cmct_codec"\
+  'audiocodec_sel'="$cmct_audio"\
+  'standard_sel'="$cmct_standard"\
+  'source_sel'="$cmct_source"\
+  'pack'="$is_package"\
+  'uplver'="$anonymous_cmct"\
+  file@"${torrent_Path}"\
+  "$cookie_cmct"|grep -om1 '[^a-z]detail[^;"]*id=[0-9]*'|grep -om1 '[0-9]*')"
 
-    if [ -z "$t_id" ]; then
-        # 辅种
-        reseed_torrent
-    fi
+  if [[ -z "$t_id" ]]; then
+    # 辅种
+    reseed_torrent
+  fi
 }
 
 #-------------------------------------#

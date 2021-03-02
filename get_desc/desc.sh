@@ -3,7 +3,7 @@
 #
 # Author: rachpt@126.com
 # Version: 3.1v
-# Date: 2019-04-16
+# Date: 2019-07-14
 #
 #-------------------------------------#
 # 调函数，生成简介
@@ -27,6 +27,8 @@ else
   debug_func "desc:dot-name.1[$dot_name]"    #----debug---
 fi
 
+# 导入自定义规则
+my_dupe_rules                 # get_desc/customize.sh
 source_desc="${ROOT_PATH}/tmp/${org_tr_name}_desc.txt"
 # byrbt, html format
 [ "$enable_byrbt" = 'yes' ] && \
@@ -36,24 +38,24 @@ source_desc="${ROOT_PATH}/tmp/${org_tr_name}_desc.txt"
   source_desc2tjupt="${ROOT_PATH}/tmp/${org_tr_name}_desc2tjupt.txt"
 
 #---to log and edit.sh---#
-if [ -z "$source_site_URL" ]; then
-    debug_func 'desc:get-source'      #----debug---
-    get_source_site                   # get_desc/detail_page.sh
+if [[ -z "$source_site_URL" ]]; then
+  get_source_site                   # get_desc/detail_page.sh
+  debug_func "desc:get-site[$source_site_URL][$s_site_uid]"  #----debug---
 else
-    debug_func 'desc:get-source[0]'   #----debug---
-    set_source_site_cookie            # get_desc/detail_page.sh
+  set_source_site_cookie            # get_desc/detail_page.sh
+  debug_func 'desc:get-site-cookie'             #----debug---
 fi
-
+# 使用预先编辑报的简介，将不会再尝试生成info
+[[ ! -s "$source_desc" ]] && \
+  match_douban_desc                   # get_desc/match.sh
 #---if not exist desc file---#
 if [ ! -s "$source_desc" ]; then
     debug_func 'desc:no-source-info'  #----debug---
-    # 自定义发布规则
-    my_dupe_rules                     # get_desc/customize.sh
     # 尝试搜索原种简介，以获取 iNFO 以及 screens
     form_source_site_get_Desc         # get_desc/detail_page.sh
     # generate info? 
     if [ ! -s "$source_desc" ]; then
-        [[ $completion -eq 100 ]] && {
+        [[ $completion -ge 92 ]] && {
         # import functions
         debug_func 'desc:info'        #----debug---
         [[ `type -t read_info_file` != "function" ]] && \
@@ -68,10 +70,8 @@ if [ ! -s "$source_desc" ]; then
         # import functions to generate desc
         #------------match imdb/douban url----------#
         debug_func 'desc:match'       #----debug---
-        [[ `type -t match_douban_imdb` != "function" ]] && \
-          source "$ROOT_PATH/get_desc/match.sh"
-        match_douban_imdb "$dot_name"
-        match_douban_imdb "$org_tr_name"
+        match_douban_imdb "$dot_name"  # get_desc/match.sh
+        match_douban_imdb "$org_tr_name"  # get_desc/match.sh
         #-----------use python/api gen desc---------#
         debug_func 'desc:generate'    #----debug---
         [[ `type -t generate_main_func` != "function" ]] && \

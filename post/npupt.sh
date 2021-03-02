@@ -20,10 +20,10 @@ downloadUrl="${post_site[npupt]}/download.php?id="
 gen_npupt_parameter() {
 
 if [ -s "$source_desc" ]; then
-npupt_des="$(echo "$descrCom_simple"|sed "s/&ratio_in_desc&/$ratio_npupt/g")
-$(cat "$source_desc"|sed '/&shc_name_douban&/d;/&eng_name_douban&/d')"
+npupt_des="${descrCom_simple//&ratio_in_desc&/$ratio_npupt}
+$(sed '/&shc_name_douban&/d;/&eng_name_douban&/d' "$source_desc")"
 else
-npupt_des="$(echo "$descrCom_simple"|sed "s/&ratio_in_desc&/$ratio_npupt/g")
+npupt_des="${descrCom_simple//&ratio_in_desc&/$ratio_npupt}
 $failed_to_get_des"
 fi
 
@@ -82,7 +82,7 @@ fi
 npupt_post_func() {
     gen_npupt_parameter
     #---post data---#
-t_id=$(http --verify=no --ignore-stdin --print=h -f  POST "$postUrl"\
+t_id="$(http --verify=no --ignore-stdin --print=h -f  POST "$postUrl"\
     'name'="$name_enc"\
     'small_descr'="$sub_title_enc"\
     'descr'="$des_enc"\
@@ -90,9 +90,9 @@ t_id=$(http --verify=no --ignore-stdin --print=h -f  POST "$postUrl"\
     'source_sel'="$npupt_source"\
     'uplver'="$anonymous_npupt"\
     file@"${torrent_Path}"\
-    "$cookie_npupt"|grep 'id='|grep 'detail'|head -1|cut -d '=' -f 2|cut -d '&' -f 1)
+    "$cookie_npupt"|grep -om1 '[^a-z]detail[^;"]*id=[0-9]*'|grep -om1 '[0-9]*')"
 
-    if [ -z "$t_id" ]; then
+    if [[ -z "$t_id" ]]; then
         # 辅种
         reseed_torrent
     fi

@@ -20,10 +20,10 @@ downloadUrl="${post_site[neu6]}/forum.php?mod=attachment&aid=NTMxNjc3NHw3OTU0OWY
 gen_neu6_parameter() {
 
 if [ -s "$source_desc" ]; then
-neu6_des="$(echo "$descrCom_simple"|sed "s/&ratio_in_desc&/$ratio_neu6/g")
-$(cat "$source_desc"|sed '/&shc_name_douban&/d;/&eng_name_douban&/d')"
+neu6_des="${descrCom_simple//&ratio_in_desc&/$ratio_neu6}
+$(sed '/&shc_name_douban&/d;/&eng_name_douban&/d' "$source_desc")"
 else
-neu6_des="$(echo "$descrCom_simple"|sed "s/&ratio_in_desc&/$ratio_neu6/g")
+neu6_des="${descrCom_simple//&ratio_in_desc&/$ratio_neu6}
 $failed_to_get_des"
 fi
 
@@ -85,7 +85,7 @@ if [[ $formhash ]] && \rm -f "$neu6_tmp"
 neu6_post_func() {
     gen_neu6_parameter
     #---post data---#
-t_id=$(http --verify=no --ignore-stdin --print=h -f  POST "$postUrl"\
+t_id="$(http --verify=no --ignore-stdin --print=h -f  POST "$postUrl"\
     mod==post action==newthread fid==156 topicsubmit==yes \
     'formhash'="$formhash"\
     'posttime'="$(date +%s)"\
@@ -96,9 +96,9 @@ t_id=$(http --verify=no --ignore-stdin --print=h -f  POST "$postUrl"\
     'specialextra'="torrent"\
     'special'="127"\
     torrent@"${torrent_Path}"\
-    "$cookie_neu6"|grep 'id='|grep 'detail'|head -1|cut -d '=' -f 2|cut -d '&' -f 1)
+    "$cookie_neu6"|grep -om1 '[^a-z]detail[^;"]*id=[0-9]*'|grep -om1 '[0-9]*')"
 
-    if [ -z "$t_id" ]; then
+    if [[ -z "$t_id" ]]; then
         # 辅种
         reseed_torrent
     fi

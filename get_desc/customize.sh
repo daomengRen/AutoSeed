@@ -3,7 +3,7 @@
 #
 # Author: rachpt@126.com
 # Version: 3.1v
-# Date: 2019-04-16
+# Date: 2019-07-14
 #
 #-------------------------------------#
 # 本文件对特定资源发布站点进行特殊设置，
@@ -15,11 +15,11 @@ my_dupe_rules() {
   local lists _d i _name _one_name _url _site _line
   lists="$ROOT_PATH/tmp/dupe-rules.txt"
   # 过滤后的数据
-  _d="$(cat "$lists"|sed -E 's/[#＃].*//g;s/[ 　]+//g;/^$/d;s/[A-Z]/\l&/g')"
+  _d="$(sed -E 's/[#＃].*//g;s/[ 　]+//g;/^$/d;s/[A-Z]/\l&/g' "$lists")"
   if [[ -f $lists && $(echo "$_d"|wc -l) -ge 1 ]]; then
     for ((i=1;i<=$(echo "$_d"|wc -l);i++)); do
       _name="$(echo "$dot_name"|sed 'y/。，？；：‘“、（）｀～！＠＃％＊ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ/.,?;:\"\",()`~!@#%*abcdefghijklmnopqrstuvwxyz/')"
-      _name="$(echo "$_name"|sed 's/[\. 　]//g;s/[A-Z]/\l&/g')"
+      _name="$(echo "${_name,,}"|sed 's/[\. 　]//g')"
       _line="$(echo "$_d"|sed -n "${i}{s/[\. 　]//g;p;q}")"
       _one_name="$(echo "$_line"|awk -F '+' '{print $NF}'|sed  "s/[\. 　]//g")"
       _one_name="$(echo "$_one_name"|sed 'y/。，？；：‘“、（）｀～！＠＃％＊ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ/.,?;:\"\",()`~!@#%*abcdefghijklmnopqrstuvwxyz/')"
@@ -61,8 +61,11 @@ my_dupe_rules() {
   else
     debug_func ':dupe:no-dupe-rules-file!'  #----debug---
   fi
-  # test tracker status
-  is_tracker_down    # static.sh
+  # test tracker's status
+  [[ ${completion:-100} -ge 92 && $HAVE_TESTED != yes ]] && {
+    is_tracker_down      # static.sh
+    HAVE_TESTED='yes'    # 减少重复测试
+  }
 }
 #----------------------------------------#
 
